@@ -81,6 +81,52 @@ def find_stockfish_binary() -> Optional[str]:
     return None
 
 
+# ----------------------------
+# Engine path resolver and quick launcher
+# ----------------------------
+import shutil
+import subprocess
+
+def resolve_engine_path(user_input: str | None) -> Optional[str]:
+    """
+    Accepts a path from the UI/env and returns a usable engine binary:
+    - If it's a directory like C:\\engine\\stockfish, try stockfish.exe inside it.
+    - If it's a bare command like 'stockfish', try PATH.
+    - If it's a full file path, return it if it exists.
+    """
+    if not user_input:
+        return None
+
+    p = user_input.strip().strip('"')
+
+    # If user pointed to a folder, try stockfish.exe inside it (Windows)
+    if os.path.isdir(p):
+        candidate = os.path.join(p, "stockfish.exe")
+        if os.path.isfile(candidate):
+            return candidate
+
+    # If it's a file path, accept if it exists
+    if os.path.isfile(p):
+        return p
+
+    # If it's a bare command, try PATH
+    which = shutil.which(p)
+    if which:
+        return which
+
+    return None
+
+def can_launch_engine(path: str) -> bool:
+    """Try to launch the engine very briefly to confirm it’s valid."""
+    try:
+        # python-chess will throw fast if it's not a valid UCI binary
+        e = chess.engine.SimpleEngine.popen_uci(path)
+        e.quit()
+        return True
+    except Exception:
+        return False
+
+
 def score_to_cp_white(score: chess.engine.PovScore) -> Optional[int]:
     """Convert a PovScore to a centipawn integer from White's perspective (mate -> huge)."""
     if score.is_mate():
@@ -302,8 +348,19 @@ col_d.metric("Event", game.headers.get("Event", "-"))
 # ----------------------------
 # Engine prep
 # ----------------------------
-sf_path = stockfish_path_manual.strip() or find_stockfish_binary()
-engine_ready = sf_path is not None and os.path.exists(sf_path)
+stockfish_path_manual = st.sidebar.text_input(
+    "Stockfish path (optional override)",
+    value=os.environ.get("STOCKFISH_PATH", r"C:\\engine\\stockfish\\stockfish.exe"),
+    help="Full path to the engine (e.g. C:\\engine\\stockfish\\stockfish.exe). You can also enter a folder like C:\\engine\\stockfish and I'll try stockfish.exe inside it."
+)
+
+# ----------------------------
+# Engine prep
+# ----------------------------
+auto_path = stockfish_path_manual.strip() or find_stockfish_binary()
+sf_path = resolve_engine_path(auto_path) if auto_path else find_stockfish_binary()
+
+engine_ready = bool(sf_path and os.path.isfile(sf_path) and can_launch_engine(sf_path))
 
 if not engine_ready:
     st.warning(stockfish_hint)
