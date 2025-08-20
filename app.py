@@ -111,21 +111,38 @@ def resolve_engine_path(user_input: str | None) -> Optional[str]:
 
     # If it's a bare command, try PATH
     which = shutil.which(p)
+def normalize_engine_path(p: Optional[str]) -> Optional[str]:
+    """Normalize input from UI/env and return a usable engine file path on Windows."""
+    if not p:
+        return None
+    p = p.strip().strip('"').strip("'")           # remove quotes/spaces
+    p = os.path.normpath(p)
+
+    # If it's a directory like C:\engine\stockfish, try stockfish.exe inside it
+    if os.path.isdir(p):
+        candidate = os.path.join(p, "stockfish.exe")
+        if os.path.isfile(candidate):
+            return candidate
+
+    # If it's a file and exists, use it
+    if os.path.isfile(p):
+        return p
+
+    # If it's a bare command (e.g., 'stockfish'), try PATH
+    which = shutil.which(p)
     if which:
         return which
 
     return None
 
 def can_launch_engine(path: str) -> bool:
-    """Try to launch the engine very briefly to confirm it’s valid."""
+    """Try to briefly launch and quit the engine to confirm it's valid."""
     try:
-        # python-chess will throw fast if it's not a valid UCI binary
         e = chess.engine.SimpleEngine.popen_uci(path)
         e.quit()
         return True
     except Exception:
         return False
-
 
 def score_to_cp_white(score: chess.engine.PovScore) -> Optional[int]:
     """Convert a PovScore to a centipawn integer from White's perspective (mate -> huge)."""
@@ -136,12 +153,10 @@ def score_to_cp_white(score: chess.engine.PovScore) -> Optional[int]:
         return sign * 100000
     return score.white().score()
 
-
 def clamp_eval(cp: Optional[int], cap: int = 1000) -> Optional[int]:
     if cp is None:
         return None
     return max(-cap, min(cap, cp))
-
 
 def material_count(board: chess.Board) -> int:
     """Rough material count (White minus Black in centipawns)."""
@@ -291,7 +306,7 @@ Alternatively, set an env var before launching:
 STOCKFISH_PATH=/full/path/to/stockfish
 """
 
-stockfish_path_manual = st.sidebar.text_input("Stockfish path (optional override)", value=os.environ.get("STOCKFISH_PATH", ""))
+
 
 # ----------------------------
 # Sample PGN
@@ -351,7 +366,8 @@ col_d.metric("Event", game.headers.get("Event", "-"))
 stockfish_path_manual = st.sidebar.text_input(
     "Stockfish path (optional override)",
     value=os.environ.get("STOCKFISH_PATH", r"C:\\engine\\stockfish\\stockfish.exe"),
-    help="Full path to the engine (e.g. C:\\engine\\stockfish\\stockfish.exe). You can also enter a folder like C:\\engine\\stockfish and I'll try stockfish.exe inside it."
+    help=("Full path to the engine (e.g. C:\\engine\\stockfish\\stockfish.exe). "
+          "Quotes are not needed. You may also enter just a folder like C:\\engine\\stockfish.")
 )
 
 # ----------------------------
