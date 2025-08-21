@@ -1,9 +1,4 @@
-import asyncio
-import sys
-
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
+# Windows-specific asyncio event loop policy is set in start.py when launching Streamlit.
 import os
 import io
 import math
