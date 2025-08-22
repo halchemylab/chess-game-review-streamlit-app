@@ -99,150 +99,146 @@ sudo apt-get install -y stockfish
 
 ### 4) Point the app to Stockfish (if needed)
 
-The app will try to auto-detect Stockfish via:
+# ♟️ PGN Game Review (Streamlit)
+
+A lightweight, local, Chess.com-style game review tool built with Streamlit + python-chess. Paste a PGN, click Analyze, and get:
+
+- Interactive board with a scrubber and optional best-move arrows
+- Evaluation graph (centipawns, White POV)
+- Per-move classifications (Best / Excellent / Good / Inaccuracy / Mistake / Blunder, plus special tags)
+- Key moments detection and a Retry trainer (enter a move and compare to the engine)
+- A friendly coach avatar that produces short comments
+- Configurable engine settings (time per move, MultiPV, threads)
+
+> ⚠️ This project is unaffiliated with Chess.com. The accuracy score and tags are transparent approximations (not CAPS2) and will not exactly match their Game Review.
+
+## Quick summary of the repo
+
+Files you care about:
+
+- `app.py` — the Streamlit app (UI + engine analysis logic)
+- `start.py` — convenience starter for Windows that sets the asyncio policy and launches Streamlit
+- `requirements.txt` — Python dependencies
+- `README.md` — this file
+
+Key libraries:
+
+- Streamlit — UI
+- python-chess — PGN parsing, board, engine integration, SVG rendering
+- Plotly — evaluation chart
+- Stockfish — an external engine binary (installed on your machine)
+
+## Requirements
+
+- Python 3.9+ recommended
+- See `requirements.txt` (Streamlit, python-chess, plotly, pandas, numpy)
+- A local Stockfish binary (any modern build)
+
+## Install and run
+
+1. Create and activate a virtual environment (recommended)
+
+PowerShell (recommended on Windows):
+
+```pwsh
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+macOS / Linux (bash/zsh):
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+2. Install Stockfish
+
+- macOS (Homebrew): `brew install stockfish`
+- Ubuntu/Debian: `sudo apt-get update && sudo apt-get install -y stockfish`
+- Windows: download a release from https://stockfishchess.org/ and unzip somewhere (e.g. `C:\Tools\Stockfish\stockfish.exe`).
+
+3. Point the app to Stockfish (app auto-detects in this order):
 
 1. `STOCKFISH_PATH` environment variable
-2. Your system `PATH`
-3. A Streamlit secret called `stockfish_path`
-4. The **sidebar** “Stockfish path (optional override)” field
+2. system `PATH` (i.e. `stockfish` is runnable)
+3. Streamlit secrets (optional)
+4. Sidebar field in the app (manual override)
 
-**Set an environment variable**
+Set `STOCKFISH_PATH` (PowerShell example):
 
-macOS/Linux:
+```pwsh
+$env:STOCKFISH_PATH = 'C:\Tools\Stockfish\stockfish-windows-x86-64.exe'
+```
+
+Or in macOS/Linux (bash/zsh):
 
 ```bash
 export STOCKFISH_PATH="/full/path/to/stockfish"
-# Example: export STOCKFISH_PATH="/opt/homebrew/bin/stockfish"
 ```
 
-Windows (PowerShell):
+4. Run the app
 
-```powershell
-$env:STOCKFISH_PATH="C:\Tools\Stockfish\stockfish-windows-x86-64.exe"
+On Windows, the supplied `start.py` sets a compatible asyncio policy and launches Streamlit (useful on some Windows setups):
+
+```pwsh
+python start.py
 ```
 
-Or just paste the full path into the app’s sidebar field.
-
-### 5) Run the app
+You can also run Streamlit directly:
 
 ```bash
 streamlit run app.py
 ```
 
-Open the URL Streamlit prints (typically [http://localhost:8501](http://localhost:8501)). Paste a PGN, click **Analyze Game**.
+Then open the URL Streamlit prints (typically http://localhost:8501).
+
+## Notes about `start.py`
+
+`start.py` simply sets `asyncio.WindowsSelectorEventLoopPolicy()` when running on `win32` and then calls `python -m streamlit run app.py` using the current interpreter. If you encounter asyncio-related warnings or Streamlit behaves oddly on Windows, use `python start.py` instead of `streamlit run app.py`.
+
+## Using the app (brief)
+
+- Paste a single-game PGN into the PGN box (a sample game is preloaded).
+- Use the sidebar to choose an avatar, analysis preset (Quick/Balanced/Deep), MultiPV (1–3), threads, and optionally override Stockfish path.
+- Click Analyze Game to run analysis (requires a valid Stockfish binary).
+- Tabs:
+  - Review: Eval graph and board scrubber with tagged moves and coach comments.
+  - Key Moments / Retry: Table of big swings/critical errors, and a position trainer to try your moves.
+  - Moves: Full per-move table with evals and engine PV.
+  - Settings: Engine detection status and notes.
+
+## Troubleshooting
+
+- "Stockfish not found":
+  - Run `stockfish -h` in a terminal to confirm it is on your PATH.
+  - Or set `STOCKFISH_PATH` and/or paste the full path into the app sidebar.
+
+- Engine errors while retrying:
+  - Verify the `stockfish` binary is correct and accessible by the user running Streamlit.
+  - Lower MultiPV or use the Quick preset if the machine is low-powered.
+
+- High CPU usage:
+  - Reduce threads and/or lower preset time per move. MultiPV > 1 increases load.
+
+## How the analysis works (high level)
+
+1. Parse the PGN mainline with `python-chess`.
+2. For each ply: query Stockfish for a PV before the move, play the game's move, then query again.
+3. Compute CP loss (how far from best) and swing (eval change), tag the move using transparent thresholds, and collect candidate lines if MultiPV > 1.
+4. Accuracy is approximated from Average Centipawn Loss (ACPL).
+
+## License
+
+MIT — see the repository for details.
 
 ---
 
-## 🕹️ Using the app
+If you'd like, I can also:
 
-* **PGN box**: Paste your game (single game per run). A sample PGN is prefilled so you can test immediately.
-* **Analyze Game**: Runs engine analysis with your chosen preset / MultiPV / threads.
-* **Review tab**:
+- Add a short CONTRIBUTING section or a one-line Docker run example
+- Create a small `launch.ps1` that sets `STOCKFISH_PATH` and starts `start.py` on Windows
 
-  * **Eval chart** (left): Hover to see exact evals by ply.
-  * **Board + scrubber** (right): Slide through moves and optionally show the engine’s recommended arrow.
-  * **Move tag + coach**: Each move gets a classification and a short, helpful comment.
-* **Key Moments / Retry**:
-
-  * Table of biggest swings and critical errors.
-  * Select a **ply** to revisit that position. Enter a SAN (e.g., `Nf3`) or UCI (`g1f3`) move and compare your idea vs. engine.
-* **Moves tab**: Full per-move table (ply, turn, SAN, tag, CP loss/swing, eval before/after, engine PV).
-* **Settings tab**: See engine detection status and notes.
-
-**Sidebar controls**
-
-* **Coach avatar**: Choose a persona (just for fun).
-* **Analysis preset**: Quick / Balanced / Deep (time per move).
-* **Candidate lines (MultiPV)**: Show 1–3 engine lines (slower with more).
-* **Engine threads**: Use more CPU cores if you have them.
-* **Stockfish path**: Manual override.
-
----
-
-## 📐 How it works (high level)
-
-1. **Parse PGN** via `python-chess` and build the mainline.
-2. For each ply:
-
-   * Ask Stockfish for evaluation and principal variation **before** the move.
-   * Play the game’s actual move.
-   * Ask Stockfish for evaluation **after** the move.
-   * Compute **CP loss** (how far off from the best engine line the played move was) and **swing** (eval change).
-   * Tag the move using transparent thresholds +
-     heuristics for **Brilliant** (sacrifice that maintains/improves eval), **Missed Win**, and **Missed Mate**.
-3. **Accuracy** is derived from **Average Centipawn Loss (ACPL)** using a simple monotone mapping to 0–100.
-4. **Key Moments** pick the largest eval swings + any Mistake/Blunder/Missed Win/Missed Mate.
-5. **Retry** lets you propose a move from a key position and compares its eval to the original.
-
----
-
-## 🧪 Sample PGN
-
-There’s a sample game preloaded in the app so you can test analysis immediately. Replace it with your own PGN when ready.
-
----
-
-## ⚠️ Limitations / Notes
-
-* Not CAPS2: **Accuracy** and **labels** are transparent approximations; they’ll feel similar but won’t match Chess.com exactly.
-* Engine limits: Depth is governed by your **time per move**, **threads**, and CPU. For deep analysis, increase time/threads.
-* Mate scores: Mating lines are represented internally as very large CP values for plotting.
-* Single-game focus: The app analyzes one game per run; batch analysis is a future enhancement.
-
----
-
-## 🧯 Troubleshooting
-
-**“Stockfish not found.”**
-
-* Run `stockfish -h` to confirm it’s on PATH.
-* Set `STOCKFISH_PATH` (see above).
-* On macOS with Homebrew, the path is often `/opt/homebrew/bin/stockfish` (Apple Silicon).
-* On Windows, point to the full `.exe` path. If using backslashes in environment variables, PowerShell handles them fine.
-
-**“Engine error” when retrying**
-
-* Make sure the Stockfish path is valid and accessible.
-* Try lowering MultiPV or using the **Quick** preset to reduce load.
-
-**High CPU usage**
-
-* Reduce threads and/or choose a lighter preset.
-* MultiPV > 1 is costlier.
-
----
-
-## 🔧 Configuration tips
-
-* **Performance vs. quality**:
-
-  * Quick ≈ 0.25s/move → very fast, surface-level tags
-  * Balanced ≈ 0.6s/move → good for casual review
-  * Deep ≈ 1.5s/move → better but slower
-* **MultiPV**: Shows alternative engine lines; use with care on low-power machines.
-* **Threads**: Start with a modest number (e.g., 4). More isn’t always faster if it causes thermal throttling.
-
----
-
-## 🗺️ Roadmap (nice-to-haves)
-
-* Opening names (ECO) and personal opening stats
-* Audio text-to-speech for the coach
-* Endgame tablebase lookups
-* Batch analysis and export (PDF/CSV)
-* Finer-grained tags (e.g., “Great”, “Book”, “Best Only Move”)
-
----
-
-## 🤝 Acknowledgements
-
-* **Stockfish** (GPLv3) — the engine doing the heavy lifting
-* **python-chess** — parsing, board logic, and engine integration
-* **Streamlit** — the app framework
-* **Plotly** — charts
-
----
-
-## 📄 License
-
-MIT — do whatever you’d like; attribution appreciated. 
+Status: README cleaned and updated to reflect `app.py` and `start.py` behavior.
